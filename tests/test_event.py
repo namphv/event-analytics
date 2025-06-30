@@ -154,3 +154,122 @@ def test_create_event_transaction_fails_if_user_not_found(event_service):
     assert "Transaction failed" in str(exc_info.value) or "not found" in str(
         exc_info.value
     )
+
+
+def test_event_count_increments_and_gsi_updates(
+    event_service, user_service, sample_users
+):
+    """Test that event counts increment correctly and GSI attributes are updated"""
+
+    # Get initial user data with GSI attributes
+    host_user_before = user_service.table.get_item(
+        Key={"PK": f"USER#{sample_users[0].id}", "SK": "PROFILE"}
+    )["Item"]
+
+    attendee_user_before = user_service.table.get_item(
+        Key={"PK": f"USER#{sample_users[1].id}", "SK": "PROFILE"}
+    )["Item"]
+
+    # Verify initial state
+    assert host_user_before["hostedEventCount"] == 0
+    assert attendee_user_before["attendedEventCount"] == 0
+    assert "GSI_UsersByHostedCount_SK" in host_user_before
+    assert "GSI_UsersByAttendedCount_SK" in attendee_user_before
+
+    # Create event with hosts and attendees
+    event_data = EventCreate(
+        slug="count-test-event",
+        title="Count Test Event",
+        description="Testing count increments",
+        startAt=datetime(2024, 6, 1, 14, 0, tzinfo=timezone.utc),
+        endAt=datetime(2024, 6, 1, 16, 0, tzinfo=timezone.utc),
+        venue="Test Venue",
+        maxCapacity=20,
+        owner=sample_users[0].id,
+        hostIds=[sample_users[0].id],
+        attendeeIds=[sample_users[1].id],
+    )
+
+    result = event_service.create_event(event_data)
+    assert isinstance(result, EventOut)
+
+    # Check updated user data
+    host_user_after = user_service.table.get_item(
+        Key={"PK": f"USER#{sample_users[0].id}", "SK": "PROFILE"}
+    )["Item"]
+
+    attendee_user_after = user_service.table.get_item(
+        Key={"PK": f"USER#{sample_users[1].id}", "SK": "PROFILE"}
+    )["Item"]
+
+    # Verify counts were incremented
+    assert host_user_after["hostedEventCount"] == 1
+    assert attendee_user_after["attendedEventCount"] == 1
+
+    # Verify GSI attributes were updated correctly
+    assert (
+        host_user_after["GSI_UsersByHostedCount_SK"]
+        == f"HOSTED_COUNT#{1:010d}#USER#{sample_users[0].id}"
+    )
+    assert (
+        attendee_user_after["GSI_UsersByAttendedCount_SK"]
+        == f"ATTENDED_COUNT#{1:010d}#USER#{sample_users[1].id}"
+    )
+    assert (
+        attendee_user_after["GSI_UsersByActivity_SK"]
+        == f"ATTENDED_COUNT#{1:010d}#USER#{sample_users[1].id}"
+    )
+
+
+def test_multiple_events_increment_counts_correctly(
+    event_service, user_service, sample_users
+):
+    """Test that hosting/attending multiple events increments counts correctly"""
+
+    # Create first event - user 0 hosts, user 1 attends
+    event1_data = EventCreate(
+        slug="multi-event-1",
+        title="Multi Event 1",
+        description="First event",
+        startAt=datetime(2024, 7, 1, 10, 0, tzinfo=timezone.utc),
+        endAt=datetime(2024, 7, 1, 12, 0, tzinfo=timezone.utc),
+        venue="Venue 1",
+        maxCapacity=50,
+        owner=sample_users[0].id,
+        hostIds=[sample_users[0].id],
+        attendeeIds=[sample_users[1].id],
+    )
+
+    event_service.create_event(event1_data)
+
+    # Create second event - user 0 hosts again, user 1 and user 2 attend
+    event2_data = EventCreate(
+        slug="multi-event-2",
+        title="Multi Event 2",
+        description="Second event",
+        startAt=datetime(2024, 7, 2, 14, 0, tzinfo=timezone.utc),
+        endAt=datetime(2024, 7, 2, 16, 0, tzinfo=timezone.utc),
+        venue="Venue 2",
+        maxCapacity=30,
+        owner=sample_users[0].id,
+        hostIds=[sample_users[0].id],
+        attendeeIds=[sample_users[1].id, sample_users[2].id],
+    )
+
+    event_service.create_event(event2_data)
+
+    # Check final counts using the filter_users method
+    host_users, _ = user_service.filter_users({"company": "Tech Corp"})
+    attendee1_users, _ = user_service.filter_users({"company": "Design Co"})
+    attendee2_users, _ = user_service.filter_users({"company": "Dev Inc"})
+
+    host_user = host_users[0]
+    attendee1_user = attendee1_users[0]
+    attendee2_user = attendee2_users[0]
+
+    # User 0 hosted 2 events
+    assert host_user.hostedEventCount == 2
+    # User 1 attended 2 events
+    assert attendee1_user.attendedEventCount == 2
+    # User 2 attended 1 event
+    assert attendee2_user.attendedEventCount == 1

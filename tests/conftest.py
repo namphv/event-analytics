@@ -3,10 +3,13 @@ import os
 import boto3
 import sys
 import time
-from scripts.init_dynamodb import create_table_if_not_exists, delete_table
 
 # Add the project root to the Python path
 sys.path.insert(0, "/app")
+
+# Import after path modification
+# flake8: noqa: E402
+from scripts.init_dynamodb import create_table_if_not_exists, delete_table
 
 TEST_TABLE_NAME = "CommunityApp_Test"
 

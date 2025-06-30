@@ -482,7 +482,7 @@ class UserService:
             )
 
             # Update GSI sort key for hosted count
-            new_count = response["Attributes"]["hostedEventCount"]
+            new_count = int(response["Attributes"]["hostedEventCount"])
             self.table.update_item(
                 Key={"PK": f"USER#{user_id}", "SK": "PROFILE"},
                 UpdateExpression="SET GSI_UsersByHostedCount_SK = :sk",
@@ -505,7 +505,7 @@ class UserService:
             )
 
             # Update GSI sort keys for attended count
-            new_count = response["Attributes"]["attendedEventCount"]
+            new_count = int(response["Attributes"]["attendedEventCount"])
             self.table.update_item(
                 Key={"PK": f"USER#{user_id}", "SK": "PROFILE"},
                 UpdateExpression="SET GSI_UsersByAttendedCount_SK = :sk1, GSI_UsersByActivity_SK = :sk2",

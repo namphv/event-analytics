@@ -1,5 +1,6 @@
 import uuid
 from app.schemas.event import EventCreate, EventOut
+from app.services.user_service import UserService
 from botocore.exceptions import ClientError
 
 
@@ -7,6 +8,7 @@ class EventService:
     def __init__(self, dynamodb_resource, table_name="CommunityApp"):
         self.dynamodb = dynamodb_resource
         self.table = dynamodb_resource.Table(table_name)
+        self.user_service = UserService(dynamodb_resource, table_name)
 
     def create_event(self, event_data: EventCreate) -> EventOut:
         """Create event with hosts and attendees in a transaction"""
@@ -66,14 +68,12 @@ class EventService:
                 }
             )
 
-            # Increment hosted event count for the user
+            # Verify user exists (will be incremented after transaction)
             transact_items.append(
                 {
-                    "Update": {
+                    "ConditionCheck": {
                         "TableName": self.table.table_name,
                         "Key": {"PK": f"USER#{host_id}", "SK": "PROFILE"},
-                        "UpdateExpression": "ADD hostedEventCount :inc",
-                        "ExpressionAttributeValues": {":inc": 1},
                         "ConditionExpression": "attribute_exists(PK)",  # User must exist
                     }
                 }
@@ -104,14 +104,12 @@ class EventService:
                 }
             )
 
-            # Increment attended event count for the user
+            # Verify user exists (will be incremented after transaction)
             transact_items.append(
                 {
-                    "Update": {
+                    "ConditionCheck": {
                         "TableName": self.table.table_name,
                         "Key": {"PK": f"USER#{attendee_id}", "SK": "PROFILE"},
-                        "UpdateExpression": "ADD attendedEventCount :inc",
-                        "ExpressionAttributeValues": {":inc": 1},
                         "ConditionExpression": "attribute_exists(PK)",  # User must exist
                     }
                 }
@@ -123,6 +121,13 @@ class EventService:
                 self.dynamodb.meta.client.transact_write_items(
                     TransactItems=transact_items
                 )
+
+            # After successful transaction, increment user counts with proper GSI updates
+            for host_id in event_data.hostIds:
+                self.user_service.increment_hosted_count(host_id)
+
+            for attendee_id in event_data.attendeeIds:
+                self.user_service.increment_attended_count(attendee_id)
 
             # Return the event object
             return EventOut(
