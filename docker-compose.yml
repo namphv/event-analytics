@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # FastAPI Application
+  app:
+    build:
+      context: .
+      target: development
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+      - ./tests:/app/tests
+      - ./scripts:/app/scripts
+    env_file:
+      - .env
+    environment:
+      - DYNAMODB_ENDPOINT_URL=http://dynamodb-local:8000
+    depends_on:
+      - dynamodb-local
+
+  dynamodb-local:
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
+    image: "amazon/dynamodb-local:latest"
+    ports:
+      - "8002:8000"
+    volumes:
+      - "./.dynamodb:/home/dynamodblocal/data"
+    working_dir: /home/dynamodblocal
+    env_file:
+      - .env
+
+  # Test Runner Service
+  test:
+    build:
+      context: .
+      target: development
+    container_name: crm-test
+    volumes:
+      - ./app:/app/app
+      - ./tests:/app/tests
+      - ./scripts:/app/scripts
+    env_file:
+      - .env
+    environment:
+      - DYNAMODB_ENDPOINT=http://dynamodb-local:8000
+      - TABLE_NAME=CommunityAppTest
+    command: pytest -v --cov=app --cov-report=html
+    depends_on:
+      - dynamodb-local
+
+volumes:
+  dynamodb_data:
+    driver: local
+
+networks:
+  default:
+    name: crm-network
