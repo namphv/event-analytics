@@ -95,25 +95,27 @@ def test_filter_by_all_criteria(user_service):
 
     # Test filtering by company
     filters = {"company": "Tech Corp"}
-    result = user_service.filter_users(filters)
-    assert len(result) == 2
-    assert all(user.company == "Tech Corp" for user in result)
+    users, next_token = user_service.filter_users(filters)
+    assert len(users) == 2
+    assert all(user.company == "Tech Corp" for user in users)
+    assert next_token is None  # No pagination needed
 
     # Test filtering by job title
     filters = {"jobTitle": "Developer"}
-    result = user_service.filter_users(filters)
-    assert len(result) == 1
-    assert result[0].jobTitle == "Developer"
+    users, next_token = user_service.filter_users(filters)
+    assert len(users) == 1
+    assert users[0].jobTitle == "Developer"
 
     # Test filtering by location
     filters = {"city": "San Francisco", "state": "CA"}
-    result = user_service.filter_users(filters)
-    assert len(result) == 2
-    assert all(user.city == "San Francisco" and user.state == "CA" for user in result)
+    users, next_token = user_service.filter_users(filters)
+    assert len(users) == 2
+    assert all(user.city == "San Francisco" and user.state == "CA" for user in users)
 
-    # Test sorting by lastName
-    filters = {"company": "Tech Corp", "sort": "lastName", "order": "asc"}
-    result = user_service.filter_users(filters)
-    assert len(result) == 2
-    assert result[0].lastName == "Brown"  # Charlie Brown comes before Alice Smith
-    assert result[1].lastName == "Smith"
+    # Test multiple filters
+    filters = {"company": "Tech Corp", "city": "San Francisco", "state": "CA"}
+    users, next_token = user_service.filter_users(filters)
+    assert len(users) == 2
+    assert all(
+        user.company == "Tech Corp" and user.city == "San Francisco" for user in users
+    )

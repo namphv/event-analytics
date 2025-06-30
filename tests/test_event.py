@@ -118,12 +118,16 @@ def test_create_event_with_participants(event_service, user_service, sample_user
 
     # Check that user counts were incremented
     # Host should have hosted count incremented
-    host_user = user_service.filter_users({"company": "Tech Corp"})[0]
+    host_users, _ = user_service.filter_users({"company": "Tech Corp"})
+    host_user = host_users[0]
     assert host_user.hostedEventCount == 1
 
     # Attendees should have attended count incremented
-    attendee1 = user_service.filter_users({"company": "Design Co"})[0]
-    attendee2 = user_service.filter_users({"company": "Dev Inc"})[0]
+    attendee1_users, _ = user_service.filter_users({"company": "Design Co"})
+    attendee1 = attendee1_users[0]
+
+    attendee2_users, _ = user_service.filter_users({"company": "Dev Inc"})
+    attendee2 = attendee2_users[0]
     assert attendee1.attendedEventCount == 1
     assert attendee2.attendedEventCount == 1
 
