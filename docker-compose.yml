@@ -14,8 +14,6 @@ services:
       - ./scripts:/app/scripts
     env_file:
       - .env
-    environment:
-      - DYNAMODB_ENDPOINT_URL=http://dynamodb-local:8000
     depends_on:
       - dynamodb-local
 
@@ -27,8 +25,10 @@ services:
     volumes:
       - "./.dynamodb:/home/dynamodblocal/data"
     working_dir: /home/dynamodblocal
-    env_file:
-      - .env
+    environment:
+      - AWS_ACCESS_KEY_ID=fake
+      - AWS_SECRET_ACCESS_KEY=fake
+      - AWS_DEFAULT_REGION=us-east-1
 
   # Test Runner Service
   test:
@@ -40,11 +40,11 @@ services:
       - ./app:/app/app
       - ./tests:/app/tests
       - ./scripts:/app/scripts
-    env_file:
-      - .env
     environment:
-      - DYNAMODB_ENDPOINT=http://dynamodb-local:8000
-      - TABLE_NAME=CommunityAppTest
+      - DYNAMODB_ENDPOINT_URL=http://dynamodb-local:8000
+      - AWS_ACCESS_KEY_ID=fake
+      - AWS_SECRET_ACCESS_KEY=fake
+      - AWS_DEFAULT_REGION=us-east-1
     command: pytest -v --cov=app --cov-report=html
     depends_on:
       - dynamodb-local
